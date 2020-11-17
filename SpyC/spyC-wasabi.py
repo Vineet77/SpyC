@@ -1,6 +1,7 @@
 #!/usr/local/bin/python2.7
 
 import os
+import sys
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from subprocess import PIPE,Popen
@@ -27,24 +28,34 @@ class SpyC(object):
     # - hello.js: glue code for compiling and running WebAssembly in the browser, uses fetch() to get hello.wasm
     # - hello.html: website that emulates a console, includes hello.js
     '''
+    def verifyCFile(self):
+        if os.path.isfile(self.c_library):
+            print('INFO: Checking for C file: %s' % self.c_library)
+        else:
+            print('FATAL: Could not locate file: %s' % self.c_library)
+            sys.exit(1)
+
     def compileWasm(self):
         try:
-            emcc = Popen(['emcc','hello.c','-s','WASM=1','-o','hello.html'], stdout=PIPE, stderr=PIPE)
+            html = (self.c_library.split('.c')[0] + '.html')
+            emcc = Popen(['emcc',self.c_library,'-s','WASM=1','-o',html], stdout=PIPE, stderr=PIPE)
             emcc.communicate()
-            print('INFO: WASM created')       
+            print('INFO: WASM created: %s' % self.c_library)       
         except Exception as e:
-           print('FATAL: Exception during WASM compile')
+           print('FATAL: Exception during WASM compile: %s')
            print(e)
 
     #
     def buildWasabi(self):
         pass
         try:
-            wasabi = Popen(['wasabi','hello.wasm'], stdout=PIPE, stderr=PIPE)
+            html = (self.c_library.split('.c')[0] + 'html')
+            wasm   = (self.c_library.split('.c')[0] + 'wasm')
+            wasabi = Popen(['wasabi',wasm], stdout=PIPE, stderr=PIPE)
             wasabi.communicate()
-            print('INFO: Wasabi build complete')
+            print('INFO: Wasabi build complete: %s' % self.c_library)
         except Exception as e:
-            print('FATAL: Exception during wasabi-wasm build')
+            print('FATAL: Exception during wasabi-wasm build: %s' % self.c_library)
             print(e)
 
         #Replace original binary with instrumented one and copy generated JavaScript 
@@ -52,7 +63,9 @@ class SpyC(object):
         cp_out.communicate()
 
         #OSX sed will throw an error, install gsed
-        inject = '/<script async type="text\/javascript" src="hello.js"><\/script>/a <script src="hello.wasabi.js"></script> hello.html'
+        js_name = (self.c_library.split('.c')[0] + 'js')
+        wasabi_name = (self.c_library.split('.c')[0] + 'wasabi.js')
+        inject = ('/<script async type="text\/javascript" src="%s"><\/script>/a <script src="%s"></script> %s' % (js_name, wasabi_name, html))
         add_code = Popen(['gsed','-i',inject], stdout=PIPE, stderr=PIPE)
         add_code.communicate()
 
@@ -64,7 +77,7 @@ class SpyC(object):
         #cp /path/to/wasabi/analyses/log-all.js .
 
         #Add log-all.js into html
-        inject = '/<script src="hello.wasabi.js"><\/script>/a <script src="log-all.js"></script> hello.html'
+        inject = ('/<script src="%s"><\/script>/a <script src="log-all.js"></script> %s' % (wasabi_name, html))
         add_code = Popen(['gsed','-i',inject], stdout=PIPE, stderr=PIPE)
         add_code.communicate()
 
@@ -91,7 +104,6 @@ class BaseCommandAble(object):
 
     def parseOptions(self):
         self.args = self.parser.parse_args()
-        print self.args
         #Get values from environment based on names stored in default arguments
         for option in [x for x in dir(self.args) if not x.startswith('_')]:
             env_name = getattr(self.args, option)
@@ -105,9 +117,9 @@ class BaseCommandAble(object):
     def buildOptions(self):
         group = self.parser.add_argument_group("SpyC Wasasbi Options",
                   "Environment variables are used by default, I.E., $SPYC_C_LIBRARY")
-        group.add_argument("--c_library", dest="c_library", 
+        group.add_argument("--c_library", dest="c_library", default='SPYC_C_LIBRARY', 
             help="C/C++ library for converstion and anaylsis")
-        group.add_argument("--server_port", dest="server_port", default='SPCY_C_SERVER_PORT',
+        group.add_argument("--server_port", dest="server_port", default='SPYC_C_SERVER_PORT',
             help="The target port to host the WebAssembly html")
 
     def buildExtraOptions(self):
@@ -123,5 +135,7 @@ if __name__ == '__main__':
 
     #Setup SpyC
     spyc = cli.spyC_wasabi
+    
+    spyc.verifyCFile()
     spyc.compileWasm()
     spyc.buildWasabi()
