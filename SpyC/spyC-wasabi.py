@@ -6,6 +6,9 @@ import sys
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from subprocess import PIPE,Popen
 
+from selenium import webdriver
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+
 # Konrad Biegaj & 
 # CS568 | Fall 2020
 
@@ -32,8 +35,9 @@ class SpyC(object):
         if os.path.isfile(self.c_library):
             print('INFO: Checking for C file: %s' % self.c_library)
         else:
-            print('FATAL: Could not locate file: %s' % self.c_library)
-            sys.exit(1)
+            pwd = os.getcwd()
+            print('FATAL: Could not locate file: %s/%s' % (pwd, self.c_library))
+            #sys.exit(1)
 
     def compileWasm(self):
         try:
@@ -45,7 +49,7 @@ class SpyC(object):
            print('FATAL: Exception during WASM compile: %s')
            print(e)
 
-    #
+    # Deploy wasabi against the .wasm
     def buildWasabi(self):
         pass
         try:
@@ -74,19 +78,29 @@ class SpyC(object):
         wasabi_path = wasabi_path + '/analyses/log-all.js'
         cp_js = Popen(['cp',wasabi_path,'.'], stdout=PIPE, stderr=PIPE)
         cp_js.communicate()
-        #cp /path/to/wasabi/analyses/log-all.js .
 
         #Add log-all.js into html
         inject = ('/<script src="%s"><\/script>/a <script src="log-all.js"></script> %s' % (wasabi_name, html))
         add_code = Popen(['gsed','-i',inject], stdout=PIPE, stderr=PIPE)
         add_code.communicate()
 
-    def startServer(self, server):
+    def startServer(self, server_port):
         #python3 -m http.server 7800
         #python -m SimpleHTTPServer
         #emrun --no_browser --port 8080 .
         #firefox http://localhost:8080/hello.html
         pass
+  
+    def logJsConsole(self, server_port):
+        d = DesiredCapabilities.CHROME
+        #Newer google chrome syntax for loggin
+        d['goog:loggingPrefs'] = { 'browser':'ALL' }
+        driver.get('https://0.0.0.0:8080/') 
+        for entry in driver.get_log('browser'):
+            print(entry)
+
+        #cleanup entry
+        return entry
 
 class BaseCommandAble(object):
 
@@ -125,7 +139,7 @@ class BaseCommandAble(object):
     def buildExtraOptions(self):
         pass
 
-#TODO add direcotry walker for multiple C files
+#TODO add directory walker for multiple C files
 if __name__ == '__main__':
     #Build Options
     cli = BaseCommandAble()
@@ -139,3 +153,9 @@ if __name__ == '__main__':
     spyc.verifyCFile()
     spyc.compileWasm()
     spyc.buildWasabi()
+
+    #Host
+
+    #ParseLog
+
+    #Write results
