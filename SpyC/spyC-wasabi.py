@@ -49,12 +49,16 @@ class SpyC(object):
            print('FATAL: Exception during WASM compile: %s')
            print(e)
 
-    # Deploy wasabi against the .wasm
+    # Deploy wasabi against the .wasm and set var names
     def buildWasabi(self):
         pass
         try:
             html = (self.c_library.split('.c')[0] + 'html')
+            self.html = html
+
             wasm   = (self.c_library.split('.c')[0] + 'wasm')
+            self.waml = wasm
+
             wasabi = Popen(['wasabi',wasm], stdout=PIPE, stderr=PIPE)
             wasabi.communicate()
             print('INFO: Wasabi build complete: %s' % self.c_library)
@@ -84,23 +88,33 @@ class SpyC(object):
         add_code = Popen(['gsed','-i',inject], stdout=PIPE, stderr=PIPE)
         add_code.communicate()
 
-    def startServer(self, server_port):
+    def startServer(self):
         #python3 -m http.server 7800
         #python -m SimpleHTTPServer
         #emrun --no_browser --port 8080 .
         #firefox http://localhost:8080/hello.html
         pass
   
-    def logJsConsole(self, server_port):
+    def logJsConsole(self):
         d = DesiredCapabilities.CHROME
         #Newer google chrome syntax for loggin
         d['goog:loggingPrefs'] = { 'browser':'ALL' }
-        driver.get('https://0.0.0.0:8080/') 
+        host = ('https://0.0.0.0:%s/%s' % (self.server_port, self.html))
+        #driver.get('https://0.0.0.0:8080/test.html') 
+        driver.get(host)
         for entry in driver.get_log('browser'):
             print(entry)
-
         #cleanup entry
         return entry
+
+    #TODO - Clean this up
+    def getFFJSLog(self):
+        d = DesiredCapabilities.FIREFOX
+        d['loggingPrefs'] = { 'browser':'ALL' }
+        fp = webdriver.FirefoxProfile()
+        driver = webdriver.Firefox(capabilities=d,firefox_profile=fp)
+        driver.get('http://0.0.0.0:%s/%s' % (self.server_port, self.html))
+        pass
 
 class BaseCommandAble(object):
 
