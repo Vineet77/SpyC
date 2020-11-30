@@ -4,11 +4,11 @@ import os
 import sys
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from subprocess import PIPE,Popen
+from subprocess import call,PIPE,Popen
 
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-
+import time
 # Konrad Biegaj & 
 # CS568 | Fall 2020
 
@@ -20,8 +20,8 @@ from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 class SpyC(object):
 
     def __init__(self, c_library=None, server_port=None):
-        self.c_library = c_library
-        self.server    = server_port
+        self.c_library      = c_library
+        self.server_port    = server_port
 
     '''
     #Use emscripten to compile native to WebAssembly
@@ -53,10 +53,10 @@ class SpyC(object):
     def buildWasabi(self):
         pass
         try:
-            html = (self.c_library.split('.c')[0] + 'html')
+            html = (self.c_library.split('.c')[0] + '.html')
             self.html = html
 
-            wasm   = (self.c_library.split('.c')[0] + 'wasm')
+            wasm   = (self.c_library.split('.c')[0] + '.wasm')
             self.waml = wasm
 
             wasabi = Popen(['wasabi',wasm], stdout=PIPE, stderr=PIPE)
@@ -66,42 +66,71 @@ class SpyC(object):
             print('FATAL: Exception during wasabi-wasm build: %s' % self.c_library)
             print(e)
 
-        #Replace original binary with instrumented one and copy generated JavaScript 
-        cp_out = Popen(['cp','out/*','.'], stdout=PIPE, stderr=PIPE)
-        cp_out.communicate()
+        #Replace original binary with instrumented one and copy generated JavaScript
+        pwd = os.getcwd()
+        wasabi_name = (self.c_library.split('.c')[0] + '.wasabi.js')
+        new_wasm = ('./out/%s' % wasm)
+        new_wasabi_js = ('./out/%s' % wasabi_name)
+        call(['cp', new_wasabi_js, '.'])
+        call(['cp', new_wasm,'.']) 
+        #cp_out = Popen(['cp',new_wasm,'.'], stdout=PIPE, stderr=PIPE)
+        #cp_out.communicate()
 
         #OSX sed will throw an error, install gsed
-        js_name = (self.c_library.split('.c')[0] + 'js')
-        wasabi_name = (self.c_library.split('.c')[0] + 'wasabi.js')
-        inject = ('/<script async type="text\/javascript" src="%s"><\/script>/a <script src="%s"></script> %s' % (js_name, wasabi_name, html))
-        add_code = Popen(['gsed','-i',inject], stdout=PIPE, stderr=PIPE)
-        add_code.communicate()
+        js_name = (self.c_library.split('.c')[0] + '.js')
+        wasabi_name = (self.c_library.split('.c')[0] + '.wasabi.js')
+        inject = ('/<script async type="text\/javascript" src="%s"><\/script>/a <script src="%s"></script>' % (js_name, wasabi_name))
+        #add_code = Popen(['gsed','-i',inject, html], stdout=PIPE, stderr=PIPE)
+        #add_code.communicate()
+        call(['gsed','-i', inject, html])
 
-        #Use example analysis that just logs all instructions with their inputs and results
+        #Use heap-analysis to identify buffer overflow concerns
         wasabi_path = os.environ['WASABI_PATH']
-        wasabi_path = wasabi_path + '/analyses/log-all.js'
+        wasabi_path = wasabi_path + '/analyses/heap-analysis.js'
         cp_js = Popen(['cp',wasabi_path,'.'], stdout=PIPE, stderr=PIPE)
         cp_js.communicate()
 
-        #Add log-all.js into html
-        inject = ('/<script src="%s"><\/script>/a <script src="log-all.js"></script> %s' % (wasabi_name, html))
-        add_code = Popen(['gsed','-i',inject], stdout=PIPE, stderr=PIPE)
-        add_code.communicate()
+        #Add heap-analysis.js into html
+        inject = ('/<script src="%s"><\/script>/a <script src="heap-analysis.js"></script>' % (wasabi_name))
+        #add_code = Popen(['gsed','-i',inject, html], stdout=PIPE, stderr=PIPE)
+        #add_code.communicate()
+        call(['gsed','-i', inject, html])
+
+    def bruteForceInput(self):
+        d = DesiredCapabilities.CHROME
+        d['goog:loggingPrefs'] = { 'browser':'ALL' }
+        driver = webdriver.Chrome(desired_capabilities=d)
+        
+        ids = driver.find_elements_by_xpath('//*[@id]')
+        for element in ids:
+            print element.tag_name
+        
+        #Add logic to find textarea or keys
+        #inputElement = driver.find_element_by_id("a1")
+        #inputElement.send_keys('1')
+        #inputElement.send_keys(Keys.ENTER)
+        #inputElement.submit() 
 
     def startServer(self):
         #python3 -m http.server 7800
         #python -m SimpleHTTPServer
+        #call(['emrun','--no_browser','--port','8080','.'])
+        headless_host = Popen(['emrun','--no_browser','--port','8080','.'], stdout=None, stderr=None, stdin=None)
+        #start_headless.communicate()
         #emrun --no_browser --port 8080 .
-        #firefox http://localhost:8080/hello.html
-        pass
+        return headless_host
   
     def logJsConsole(self):
         d = DesiredCapabilities.CHROME
         #Newer google chrome syntax for loggin
         d['goog:loggingPrefs'] = { 'browser':'ALL' }
-        host = ('https://0.0.0.0:%s/%s' % (self.server_port, self.html))
-        #driver.get('https://0.0.0.0:8080/test.html') 
+        driver = webdriver.Chrome(desired_capabilities=d)
+        host = ('http://0.0.0.0:%s/%s' % (self.server_port, self.html))
         driver.get(host)
+
+        #The driver should wait for the page to load, but saw cases 
+        #where it didn't -- add sleep to get full console log
+        time.sleep(10)
         for entry in driver.get_log('browser'):
             print(entry)
         #cleanup entry
@@ -169,7 +198,9 @@ if __name__ == '__main__':
     spyc.buildWasabi()
 
     #Host
+    local_host = spyc.startServer()
 
     #ParseLog
-
+    spyc.logJsConsole()
+    local_host.terminate()
     #Write results
