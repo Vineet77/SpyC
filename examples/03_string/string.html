@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>WebAssembly Square function</title>
+    <style>
+        div {
+            font-size: 30px;
+            text-align: center;
+            color: orange;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="textcontent"></div>
+    <script src="string.js"></script>
+    <script src="string.wasabi.js"></script>
+    <script src="analysis.js"></script>
+    <script>
+        Module['onRuntimeInitialized'] = function () {
+            const s = Module.ccall('allocateBuffer', 'string', ['string'], ["wasm"])
+            document.getElementById("textcontent").innerHTML = "output from allocate buffer is " + s;
+        };
+    </script>
+</body>
+
+</html>
