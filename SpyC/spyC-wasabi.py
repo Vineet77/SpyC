@@ -1,13 +1,17 @@
+#!/usr/local/bin/python2.7
+
+import datetime
 import os
 import sys
+import time
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from subprocess import call,PIPE,Popen
 
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-import time
-# Konrad Biegaj & 
+
+# Konrad Biegaj & Vineet Patel 
 # CS568 | Fall 2020
 
 # Automate converting C libaries into WebAssemably files
@@ -40,8 +44,11 @@ class SpyC(object):
     def compileWasm(self):
         try:
             html = (self.c_library.split('.c')[0] + '.html')
+            call(['emcc',self.c_library,'-s','WASM=1','-o',html])
             emcc = Popen(['emcc',self.c_library,'-s','WASM=1','-o',html], stdout=PIPE, stderr=PIPE)
             emcc.communicate()
+            print emcc.stderr
+            #sys.exit(0)
             print('INFO: WASM created: %s' % self.c_library)       
         except Exception as e:
            print('FATAL: Exception during WASM compile: %s')
@@ -82,39 +89,23 @@ class SpyC(object):
         #add_code.communicate()
         call(['gsed','-i', inject, html])
 
-        #Use heap-analysis to identify buffer overflow concerns
+        #Use example analysis that just logs all instructions with their inputs and results
         wasabi_path = os.environ['WASABI_PATH']
         wasabi_path = wasabi_path + '/analyses/heap-analysis.js'
         cp_js = Popen(['cp',wasabi_path,'.'], stdout=PIPE, stderr=PIPE)
         cp_js.communicate()
 
-        #Add heap-analysis.js into html
+        #Add log-all.js into html
         inject = ('/<script src="%s"><\/script>/a <script src="heap-analysis.js"></script>' % (wasabi_name))
         #add_code = Popen(['gsed','-i',inject, html], stdout=PIPE, stderr=PIPE)
         #add_code.communicate()
         call(['gsed','-i', inject, html])
-
-    def bruteForceInput(self):
-        d = DesiredCapabilities.CHROME
-        d['goog:loggingPrefs'] = { 'browser':'ALL' }
-        driver = webdriver.Chrome(desired_capabilities=d)
-        
-        ids = driver.find_elements_by_xpath('//*[@id]')
-        for element in ids:
-            print element.tag_name
-        
-        #Add logic to find textarea or keys
-        #inputElement = driver.find_element_by_id("a1")
-        #inputElement.send_keys('1')
-        #inputElement.send_keys(Keys.ENTER)
-        #inputElement.submit() 
 
     def startServer(self):
         #python3 -m http.server 7800
         #python -m SimpleHTTPServer
         #call(['emrun','--no_browser','--port','8080','.'])
         headless_host = Popen(['emrun','--no_browser','--port','8080','.'], stdout=None, stderr=None, stdin=None)
-        #start_headless.communicate()
         #emrun --no_browser --port 8080 .
         return headless_host
   
@@ -129,10 +120,12 @@ class SpyC(object):
         #The driver should wait for the page to load, but saw cases 
         #where it didn't -- add sleep to get full console log
         time.sleep(10)
+        data_out = []
         for entry in driver.get_log('browser'):
-            print(entry)
-        #cleanup entry
-        return entry
+            print(entry['message'])
+            line = str(entry['message'] + '\n')
+            data_out.append(line)
+        return data_out
 
     #TODO - Clean this up
     def getFFJSLog(self):
@@ -142,6 +135,21 @@ class SpyC(object):
         driver = webdriver.Firefox(capabilities=d,firefox_profile=fp)
         driver.get('http://0.0.0.0:%s/%s' % (self.server_port, self.html))
         pass
+    
+    #Write out from wasabi analysis
+    def writeJson(self, out_data):
+        print out_data
+        #Verify output 
+        if not os.path.exists('spyc_out'):
+            os.makedirs('spyc_out') 
+       
+        timestamp = str(datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
+        analysis  = ('%s_%s_analysis.json' % (timestamp, self.c_library))
+        with open('spyc_out/' +  analysis, mode='w') as outfile:
+            outfile.writelines(out_data)
+            #for entry in out_data:
+            #    outfile.write(entry)
+
 
 class BaseCommandAble(object):
 
@@ -199,6 +207,8 @@ if __name__ == '__main__':
     local_host = spyc.startServer()
 
     #ParseLog
-    spyc.logJsConsole()
+    chrome_js_log = spyc.logJsConsole()
     local_host.terminate()
+
     #Write results
+    spyc.writeJson(chrome_js_log)
