@@ -1,5 +1,3 @@
-#!/usr/local/bin/python2.7
-
 import os
 import sys
 
@@ -164,7 +162,7 @@ class BaseCommandAble(object):
         #Get values from environment based on names stored in default arguments
         for option in [x for x in dir(self.args) if not x.startswith('_')]:
             env_name = getattr(self.args, option)
-            if type(env_name) in (str, unicode) and env_name.startswith('SPYC_'):
+            if type(env_name) == str and env_name.startswith('SPYC_'):
                 value = os.environ.get(env_name)
                 if value is not None:
                     setattr(self.args, option, value)
