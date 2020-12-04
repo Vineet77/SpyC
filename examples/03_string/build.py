@@ -61,13 +61,17 @@ driver.get(host)
 # The driver should wait for the page to load, but saw cases
 # where it didn't -- add sleep to get full console log
 time.sleep(5)
+
+inputs = driver.find_elements_by_css_selector('input')
+print(inputs)
+
 data_out = []
+driver.execute_script("analyizeMallocHistoy();")
 for entry in driver.get_log('browser'):
-    print(entry['message'])
+    # print(entry['message'])
     line = str(entry['message'] + '\n')
     data_out.append(line)
 
-print(data_out)
 
 input("Press Enter to continue...")
 
