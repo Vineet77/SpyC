@@ -19,16 +19,11 @@ function analyizeMallocHistoy() {
     const lastMallocStore = prevMallocStores[prevMallocStores.length - 1]
     const end = getNextAddr(lastMallocStore.op, lastMallocStore.addr);
     const mallocRegion = mallocs.find(m => begin >= m.addr && begin <= m.addr);
-    console.log("Potential buffer overflow. Continuous allocation of size", end - begin, "at", "0x" + begin.toString(16), "overflowing malloc region at", "0x" + mallocRegion.addr.toString(16), "of size", mallocRegion.size);
+    console.log("Potential buffer overflow. Continuous allocation of size", end - begin, "at", begin, "overflowing malloc region at",  mallocRegion.addr, "of size", mallocRegion.size);
 }
 
 
 (function () {
-
-
-
-
-
 
 
     function updateMallocHistory(op, addr, inMallocRegion) {
@@ -76,7 +71,7 @@ function analyizeMallocHistoy() {
 
         call_post(location, values) {
             if (mallocLocation !== undefined && mallocLocation.func == location.func && mallocLocation.instr == location.instr) {
-                console.log("malloc call of size", mallocSize, "got address", values[0].toString(16));
+                console.log("malloc call of size", mallocSize, "got address", values[0]);
                 mallocs.push({ addr: values[0], size: mallocSize });
                 mallocLocation = undefined;
             }
@@ -93,14 +88,14 @@ function analyizeMallocHistoy() {
             for (malloc of mallocs) {
                 if (effectiveAddr >= malloc.addr && effectiveAddr <= malloc.addr + malloc.size) {
                     mallocRegion = malloc;
+                    break;
                 }
-                break;
             }
             if (mallocRegion !== null) {
-                console.log(op, "of value", "0x" + value.toString(16), "happened at", "0x" + effectiveAddr.toString(16), "in malloced region at addr", "0x" + mallocRegion.addr.toString(16), "of size", mallocRegion.size);
+                console.log(op, "of value", "0x" + value.toString(16), "happened at",  effectiveAddr, "in malloced region at addr",  mallocRegion.addr, "of size", mallocRegion.size);
                 updateMallocHistory(op, effectiveAddr, true);
             } else {
-                console.log(op, "of value", "0x" + value.toString(16), "happened at", "0x" + effectiveAddr.toString(16));
+                console.log(op, "of value", "0x" + value.toString(16), "happened at", effectiveAddr);
                 updateMallocHistory(op, effectiveAddr, false);
             }
 

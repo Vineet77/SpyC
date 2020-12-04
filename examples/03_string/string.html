@@ -15,14 +15,40 @@
 
 <body>
     <div id="textcontent"></div>
+    <form onsubmit="return onSumbit1();">
+        <input type="text" id="input1">
+    </form>
+    <form onsubmit="return onSumbit2();">
+        <input type="text" id="input2">
+    </form>
     <script src="string.js"></script>
     <script src="string.wasabi.js"></script>
     <script src="analysis.js"></script>
     <script>
-        Module['onRuntimeInitialized'] = function () {
-            const s = Module.ccall('allocateBuffer', 'string', ['string'], ["wasm"])
+        
+        function onSumbit1(){
+            const input1 = document.getElementById('input1').value; 
+            console.log(input1);
+            const s = Module.ccall('allocateBuffer', 'string', ['string'], [input1])
             document.getElementById("textcontent").innerHTML = "output from allocate buffer is " + s;
-        };
+            return false;
+        }
+
+        function onSumbit2(){
+            const input1 = document.getElementById('input2').value; 
+            console.log(input1);
+            const s = Module.ccall('allocateBuffer', 'string', ['string'], [input1])
+            document.getElementById("textcontent").innerHTML = "output from allocate buffer is " + s;
+            return false;
+        }
+
+
+        // Module['onRuntimeInitialized'] = function () {
+        //     // const input = '\f'.repeat(64); 
+        //     const input = [...Array(65)].map(() => Math.random().toString(36)[2]).join('')
+        //     const s = Module.ccall('allocateBuffer', 'string', ['string'], [input])
+        //     document.getElementById("textcontent").innerHTML = "output from allocate buffer is " + s;
+        // };
     </script>
 </body>
 

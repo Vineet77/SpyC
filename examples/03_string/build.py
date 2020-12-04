@@ -3,9 +3,12 @@ import subprocess
 from pathlib import Path
 import shutil
 import time
+import random
+import string
 
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+from selenium.webdriver.common.keys import Keys
 
 # parse args
 parser = argparse.ArgumentParser(
@@ -15,7 +18,8 @@ parser.add_argument('-c', action='store', dest='cFile',
                     help='C file to be compiled', type=str)
 parser.add_argument('-e', action='store', dest='exportedFuncs',
                     help='Exported functions from the c file', type=str)
-parser.add_argument('-f', action='store', dest='htmlFile', help="html file to run analysis on", type=str)
+parser.add_argument('-f', action='store', dest='htmlFile',
+                    help="html file to run analysis on", type=str)
 
 args = parser.parse_args()
 
@@ -60,20 +64,23 @@ driver.get(host)
 
 # The driver should wait for the page to load, but saw cases
 # where it didn't -- add sleep to get full console log
-time.sleep(5)
+time.sleep(1)
 
 inputs = driver.find_elements_by_css_selector('input')
-print(inputs)
 
-data_out = []
-driver.execute_script("analyizeMallocHistoy();")
-for entry in driver.get_log('browser'):
-    # print(entry['message'])
-    line = str(entry['message'] + '\n')
-    data_out.append(line)
+for inputField in inputs:
+    i = ''.join(random.choices(
+        string.ascii_uppercase + string.ascii_lowercase, k=64))
+    inputField.send_keys(i)
+    inputField.send_keys(Keys.ENTER)
 
-
-input("Press Enter to continue...")
+    data_out = []
+    driver.execute_script("analyizeMallocHistoy();")
+    for entry in driver.get_log('browser'):
+        line = str(entry['message'] + '\n')
+        if "Potential buffer overflow" in line:
+            print(inputField.get_attribute('id'))
+            print(line)
 
 driver.quit()
 headless_server.kill()
