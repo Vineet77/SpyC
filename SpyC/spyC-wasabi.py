@@ -39,7 +39,7 @@ class SpyC(object):
         else:
             pwd = os.getcwd()
             print('FATAL: Could not locate file: %s/%s' % (pwd, self.c_library))
-            #sys.exit(1)
+            sys.exit(1)
 
     def compileWasm(self):
         try:
@@ -47,12 +47,11 @@ class SpyC(object):
             call(['emcc',self.c_library,'-s','WASM=1','-o',html])
             emcc = Popen(['emcc',self.c_library,'-s','WASM=1','-o',html], stdout=PIPE, stderr=PIPE)
             emcc.communicate()
-            print emcc.stderr
-            #sys.exit(0)
             print('INFO: WASM created: %s' % self.c_library)       
         except Exception as e:
            print('FATAL: Exception during WASM compile: %s')
            print(e)
+           sys.exit(1)
 
     # Deploy wasabi against the .wasm and set var names
     def buildWasabi(self):
@@ -78,15 +77,11 @@ class SpyC(object):
         new_wasabi_js = ('./out/%s' % wasabi_name)
         call(['cp', new_wasabi_js, '.'])
         call(['cp', new_wasm,'.']) 
-        #cp_out = Popen(['cp',new_wasm,'.'], stdout=PIPE, stderr=PIPE)
-        #cp_out.communicate()
 
         #OSX sed will throw an error, install gsed
         js_name = (self.c_library.split('.c')[0] + '.js')
         wasabi_name = (self.c_library.split('.c')[0] + '.wasabi.js')
         inject = ('/<script async type="text\/javascript" src="%s"><\/script>/a <script src="%s"></script>' % (js_name, wasabi_name))
-        #add_code = Popen(['gsed','-i',inject, html], stdout=PIPE, stderr=PIPE)
-        #add_code.communicate()
         call(['gsed','-i', inject, html])
 
         #Use example analysis that just logs all instructions with their inputs and results
@@ -97,16 +92,10 @@ class SpyC(object):
 
         #Add log-all.js into html
         inject = ('/<script src="%s"><\/script>/a <script src="heap-analysis.js"></script>' % (wasabi_name))
-        #add_code = Popen(['gsed','-i',inject, html], stdout=PIPE, stderr=PIPE)
-        #add_code.communicate()
         call(['gsed','-i', inject, html])
 
     def startServer(self):
-        #python3 -m http.server 7800
-        #python -m SimpleHTTPServer
-        #call(['emrun','--no_browser','--port','8080','.'])
         headless_host = Popen(['emrun','--no_browser','--port','8080','.'], stdout=None, stderr=None, stdin=None)
-        #emrun --no_browser --port 8080 .
         return headless_host
   
     def logJsConsole(self):
@@ -133,8 +122,14 @@ class SpyC(object):
         d['loggingPrefs'] = { 'browser':'ALL' }
         fp = webdriver.FirefoxProfile()
         driver = webdriver.Firefox(capabilities=d,firefox_profile=fp)
-        driver.get('http://0.0.0.0:%s/%s' % (self.server_port, self.html))
-        pass
+        driver.get('https://0.0.0.0:%s/%s' % (self.server_port, self.html))
+                
+        time.sleep(10)
+        data_out = []
+        for entry in driver.get_log('browser'):
+            line = str(entry['message'] + '\n')
+            data_out.append(line)
+        return data_out
     
     #Write out from wasabi analysis
     def writeJson(self, out_data):
@@ -146,10 +141,18 @@ class SpyC(object):
         timestamp = str(datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
         analysis  = ('%s_%s_analysis.json' % (timestamp, self.c_library))
         with open('spyc_out/' +  analysis, mode='w') as outfile:
+            print('INFO: Priting out analysis to: spyc_out/%s' % analysis)
             outfile.writelines(out_data)
-            #for entry in out_data:
-            #    outfile.write(entry)
 
+    def probeElements(self):
+        d = DesiredCapabilities.CHROME
+        driver = webdriver.Chrome(desired_capabilities=d)
+        host = ('http://0.0.0.0:%s/%s' % (self.server_port, self.html))
+        driver.get(host)
+
+        ids = driver.find_elements_by_xpath('//*[@id]')
+        for ii in ids:
+            print ii.tag_name
 
 class BaseCommandAble(object):
 
@@ -188,14 +191,11 @@ class BaseCommandAble(object):
     def buildExtraOptions(self):
         pass
 
-#TODO add directory walker for multiple C files
 if __name__ == '__main__':
     #Build Options
     cli = BaseCommandAble()
     cli.setup()
      
-    #Move to target c directory
-
     #Setup SpyC
     spyc = cli.spyC_wasabi
     
@@ -205,9 +205,12 @@ if __name__ == '__main__':
 
     #Host
     local_host = spyc.startServer()
-
+    
     #ParseLog
     chrome_js_log = spyc.logJsConsole()
+    #firefox_js_log = spyc.getFFJSLog()
+
+    #Terminate client 
     local_host.terminate()
 
     #Write results
