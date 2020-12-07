@@ -5,8 +5,9 @@ Review and identify security concerns when using native C/C++ ported to WebAssem
 
 # Requirements 
 ```
-EMCC   - https://emscripten.org/docs/getting_started/downloads.html
-Wasabi - https://github.com/danleh/wasabi
+EMCC             - https://emscripten.org/docs/getting_started/downloads.html
+Wasabi           - https://github.com/danleh/wasabi
+Chrome WebDriver - https://chromedriver.chromium.org/getting-started
 ```
 
 # How to use

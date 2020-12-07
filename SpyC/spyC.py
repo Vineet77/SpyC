@@ -1,3 +1,11 @@
+# Konrad Biegaj & Vineet Patel
+# CS568 | Fall 2020
+
+# Automate converting C libaries into WebAssemably files
+# After converted, deploy wasabi to generate an analysis without the
+# need for the manual steps.
+# Also runs selenium to automatically enter values to to every input field to see if a buffer overflow occurred.
+
 import argparse
 import subprocess
 from pathlib import Path
@@ -21,6 +29,8 @@ parser.add_argument('-e', action='store', dest='exportedFuncs', nargs='+',
                     help='Exported functions from the c file', type=str)
 parser.add_argument('-f', action='store', dest='htmlFile',
                     help="html file to run analysis on", type=str)
+parser.add_argument('-s', action='store', dest='inputSize',
+                    help='size of the input to be entered by selenimum', type=int)
 
 args = parser.parse_args()
 
@@ -94,7 +104,7 @@ inputs = driver.find_elements_by_css_selector('input')
 
 for inputField in inputs:
     i = ''.join(random.choices(
-        string.ascii_uppercase + string.ascii_lowercase, k=64))
+        string.ascii_uppercase + string.ascii_lowercase, k=args.inputSize))
     inputField.send_keys(i)
     inputField.send_keys(Keys.ENTER)
 
